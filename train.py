@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 from dataset import Shuttlecock_Trajectory_Dataset
-from test import eval_tracknet, eval_inpaintnet
+from utils.test import eval_tracknet, eval_inpaintnet
 from utils.general import ResumeArgumentParser, get_model, to_img_format
 from utils.metric import WBCELoss
 from utils.visualize import plot_heatmap_pred_sample, plot_traj_pred_sample, write_to_tb
