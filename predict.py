@@ -66,50 +66,48 @@ def predict(indices, y_pred=None, c_pred=None, img_scaler=(1, 1)):
             else:
                 break
     
-    return pred_dict    
+    return pred_dict
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--video_file', type=str, help='file path of the video')
-    parser.add_argument('--tracknet_file', type=str, help='file path of the TrackNet model checkpoint')
-    parser.add_argument('--inpaintnet_file', type=str, default='', help='file path of the InpaintNet model checkpoint')
-    parser.add_argument('--batch_size', type=int, default=16, help='batch size for inference')
-    parser.add_argument('--eval_mode', type=str, default='weight', choices=['nonoverlap', 'average', 'weight'], help='evaluation mode')
-    parser.add_argument('--max_sample_num', type=int, default=1800, help='maximum number of frames to sample for generating median image')
-    parser.add_argument('--video_range', type=lambda splits: [int(s) for s in splits.split(',')], default=None, help='range of start second and end second of the video for generating median image')
-    parser.add_argument('--save_dir', type=str, default='pred_result', help='directory to save the prediction result')
-    parser.add_argument('--large_video', action='store_true', default=False, help='whether to process large video')
-    parser.add_argument('--output_video', action='store_true', default=False, help='whether to output video with predicted trajectory')
-    parser.add_argument('--traj_len', type=int, default=8, help='length of trajectory to draw on video')
-    args = parser.parse_args()
-
-    num_workers = args.batch_size if args.batch_size <= 16 else 16
-    video_file = args.video_file
+def predict_video(
+    video_file: str,  
+    tracknet_file: str, 
+    large_video=False, 
+    output_video=False, 
+    traj_len:int = 8,
+    inpaintnet_file:str = '',
+    batch_size:int = 16,
+    eval_mode:str='weight',
+    video_range=None,
+    save_dir:str='pred_result',
+    max_sample_num:int=1800
+):
+    num_workers = batch_size if batch_size <= 16 else 16
+    video_file = video_file
     video_name = video_file.split('/')[-1][:-4]
-    video_range = args.video_range if args.video_range else None
-    large_video = args.large_video
-    out_csv_file = os.path.join(args.save_dir, f'{video_name}_ball.csv')
-    out_video_file = os.path.join(args.save_dir, f'{video_name}.mp4')
+    video_range = video_range if video_range else None
+    large_video = large_video
+    out_csv_file = os.path.join(save_dir, f'{video_name}_ball.csv')
+    out_video_file = os.path.join(save_dir, f'{video_name}.mp4')
 
-    if not os.path.exists(args.save_dir):
-        os.makedirs(args.save_dir)
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
     
     # Load model
-    tracknet_ckpt = torch.load(args.tracknet_file)
+    tracknet_ckpt = torch.load(tracknet_file)
     tracknet_seq_len = tracknet_ckpt['param_dict']['seq_len']
     bg_mode = tracknet_ckpt['param_dict']['bg_mode']
     tracknet = get_model('TrackNet', tracknet_seq_len, bg_mode).cuda()
     tracknet.load_state_dict(tracknet_ckpt['model'])
 
-    if args.inpaintnet_file:
-        inpaintnet_ckpt = torch.load(args.inpaintnet_file)
+    if inpaintnet_file:
+        inpaintnet_ckpt = torch.load(inpaintnet_file)
         inpaintnet_seq_len = inpaintnet_ckpt['param_dict']['seq_len']
         inpaintnet = get_model('InpaintNet').cuda()
         inpaintnet.load_state_dict(inpaintnet_ckpt['model'])
     else:
         inpaintnet = None
 
-    cap = cv2.VideoCapture(args.video_file)
+    cap = cv2.VideoCapture(video_file)
     w, h = (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
     w_scaler, h_scaler = w / WIDTH, h / HEIGHT
     img_scaler = (w_scaler, h_scaler)
@@ -120,19 +118,19 @@ if __name__ == '__main__':
     # Test on TrackNet
     tracknet.eval()
     seq_len = tracknet_seq_len
-    if args.eval_mode == 'nonoverlap':
+    if eval_mode == 'nonoverlap':
         # Create dataset with non-overlap sampling
         if large_video:
             dataset = Video_IterableDataset(video_file, seq_len=seq_len, sliding_step=seq_len, bg_mode=bg_mode, 
-                                            max_sample_num=args.max_sample_num, video_range=video_range)
-            data_loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False, drop_last=False)
+                                            max_sample_num=max_sample_num, video_range=video_range)
+            data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, drop_last=False)
             print(f'Video length: {dataset.video_len}')
         else:
             # Sample all frames from video
-            frame_list = generate_frames(args.video_file)
+            frame_list = generate_frames(video_file)
             dataset = Shuttlecock_Trajectory_Dataset(seq_len=seq_len, sliding_step=seq_len, data_mode='heatmap', bg_mode=bg_mode,
                                                  frame_arr=np.array(frame_list)[:, :, :, ::-1], padding=True)
-            data_loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False, num_workers=num_workers, drop_last=False)
+            data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, drop_last=False)
 
         for step, (i, x) in enumerate(tqdm(data_loader)):
             x = x.float().cuda()
@@ -147,17 +145,17 @@ if __name__ == '__main__':
         # Create dataset with overlap sampling for temporal ensemble
         if large_video:
             dataset = Video_IterableDataset(video_file, seq_len=seq_len, sliding_step=1, bg_mode=bg_mode,
-                                            max_sample_num=args.max_sample_num, video_range=video_range)
-            data_loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False, drop_last=False)
+                                            max_sample_num=max_sample_num, video_range=video_range)
+            data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, drop_last=False)
             video_len = dataset.video_len
             print(f'Video length: {video_len}')
             
         else:
             # Sample all frames from video
-            frame_list = generate_frames(args.video_file)
+            frame_list = generate_frames(video_file)
             dataset = Shuttlecock_Trajectory_Dataset(seq_len=seq_len, sliding_step=1, data_mode='heatmap', bg_mode=bg_mode,
                                                  frame_arr=np.array(frame_list)[:, :, :, ::-1])
-            data_loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False, num_workers=num_workers, drop_last=False)
+            data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, drop_last=False)
             video_len = len(frame_list)
         
         # Init prediction buffer params
@@ -166,7 +164,7 @@ if __name__ == '__main__':
         batch_i = torch.arange(seq_len) # [0, 1, 2, 3, 4, 5, 6, 7]
         frame_i = torch.arange(seq_len-1, -1, -1) # [7, 6, 5, 4, 3, 2, 1, 0]
         y_pred_buffer = torch.zeros((buffer_size, seq_len, HEIGHT, WIDTH), dtype=torch.float32)
-        weight = get_ensemble_weight(seq_len, args.eval_mode)
+        weight = get_ensemble_weight(seq_len, eval_mode)
         for step, (i, x) in enumerate(tqdm(data_loader)):
             x = x.float().cuda()
             b_size, seq_len = i.shape[0], i.shape[1]
@@ -216,10 +214,10 @@ if __name__ == '__main__':
         tracknet_pred_dict['Inpaint_Mask'] = generate_inpaint_mask(tracknet_pred_dict, th_h=h*0.05)
         inpaint_pred_dict = {'Frame':[], 'X':[], 'Y':[], 'Visibility':[]}
 
-        if args.eval_mode == 'nonoverlap':
+        if eval_mode == 'nonoverlap':
             # Create dataset with non-overlap sampling
             dataset = Shuttlecock_Trajectory_Dataset(seq_len=seq_len, sliding_step=seq_len, data_mode='coordinate', pred_dict=tracknet_pred_dict, padding=True)
-            data_loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False, num_workers=num_workers, drop_last=False)
+            data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, drop_last=False)
 
             for step, (i, coor_pred, inpaint_mask) in enumerate(tqdm(data_loader)):
                 coor_pred, inpaint_mask = coor_pred.float(), inpaint_mask.float()
@@ -239,8 +237,8 @@ if __name__ == '__main__':
         else:
             # Create dataset with overlap sampling for temporal ensemble
             dataset = Shuttlecock_Trajectory_Dataset(seq_len=seq_len, sliding_step=1, data_mode='coordinate', pred_dict=tracknet_pred_dict)
-            data_loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False, num_workers=num_workers, drop_last=False)
-            weight = get_ensemble_weight(seq_len, args.eval_mode)
+            data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, drop_last=False)
+            weight = get_ensemble_weight(seq_len, eval_mode)
 
             # Init buffer params
             num_sample, sample_count = len(dataset), 0
@@ -306,7 +304,34 @@ if __name__ == '__main__':
     write_pred_csv(pred_dict, save_file=out_csv_file)
 
     # Write video with predicted coordinates
-    if args.output_video:
-        write_pred_video(video_file, pred_dict, save_file=out_video_file, traj_len=args.traj_len)
+    if output_video:
+        write_pred_video(video_file, pred_dict, save_file=out_video_file, traj_len=traj_len)
 
     print('Done.')
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--video_file', type=str, help='file path of the video')
+    parser.add_argument('--tracknet_file', type=str, help='file path of the TrackNet model checkpoint')
+    parser.add_argument('--inpaintnet_file', type=str, default='', help='file path of the InpaintNet model checkpoint')
+    parser.add_argument('--batch_size', type=int, default=16, help='batch size for inference')
+    parser.add_argument('--eval_mode', type=str, default='weight', choices=['nonoverlap', 'average', 'weight'], help='evaluation mode')
+    parser.add_argument('--max_sample_num', type=int, default=1800, help='maximum number of frames to sample for generating median image')
+    parser.add_argument('--video_range', type=lambda splits: [int(s) for s in splits.split(',')], default=None, help='range of start second and end second of the video for generating median image')
+    parser.add_argument('--save_dir', type=str, default='pred_result', help='directory to save the prediction result')
+    parser.add_argument('--large_video', action='store_true', default=False, help='whether to process large video')
+    parser.add_argument('--output_video', action='store_true', default=False, help='whether to output video with predicted trajectory')
+    parser.add_argument('--traj_len', type=int, default=8, help='length of trajectory to draw on video')
+    args = parser.parse_args()
+
+    predict_video(
+        video_file=args.video_file,
+        tracknet_file=args.tracknet_file,
+        inpaintnet_file=args.inpaintnet_file,
+        batch_size=args.batch_size,
+        eval_mode=args.eval_mode,
+        video_range=args.video_range,
+        save_dir=args.save_dir,
+        max_sample_num=args.max_sample_num
+    )
