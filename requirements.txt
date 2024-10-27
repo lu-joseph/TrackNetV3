@@ -6,3 +6,5 @@ Pillow==10.0.0
 plotly==5.8.2
 torch==2.0.0
 parse
+tqdm
+pycocotools
