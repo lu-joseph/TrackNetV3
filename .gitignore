@@ -5,7 +5,7 @@ ckpts/
 figure/
 __pycache__/
 utils/__pycache__/
-prediction/
+pred_result/
 test_prediction/
 dataset_test.py
 fps_exp.py
@@ -16,3 +16,4 @@ model_compare.py
 predict_old.py
 *.sh
 *.mp4
+.bash_history
