@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 
 from dataset import data_dir
-from utils.general import *
+from tracknetv3_utils.general import *
 
 def write_to_tb(model_type, tb_writer, losses, val_res, epoch):
     """ Write training and validation results to tensorboard. 

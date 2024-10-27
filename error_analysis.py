@@ -15,7 +15,7 @@ from dash.exceptions import PreventUpdate
 from dash.dependencies import Input, Output
 
 from dataset import data_dir
-from utils.general import *
+from tracknetv3_utils.general import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--split', type=str, default='test')

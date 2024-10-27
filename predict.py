@@ -6,9 +6,9 @@ from tqdm import tqdm
 import torch
 from torch.utils.data import DataLoader
 
-from .test import predict_location, get_ensemble_weight, generate_inpaint_mask
+from .tracknetv3_test import predict_location, get_ensemble_weight, generate_inpaint_mask
 from dataset import Shuttlecock_Trajectory_Dataset, Video_IterableDataset
-from utils.general import *
+from tracknetv3_utils.general import *
 
 
 def predict(indices, y_pred=None, c_pred=None, img_scaler=(1, 1)):

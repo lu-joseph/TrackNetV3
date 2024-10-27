@@ -2,8 +2,8 @@ import os
 import torch
 import argparse
 
-from test import test
-from utils.general import get_model
+from tracknetv3_test import test
+from tracknetv3_utils.general import get_model
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

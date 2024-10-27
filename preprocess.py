@@ -3,8 +3,8 @@ import parse
 import shutil
 
 from dataset import data_dir
-from utils.general import list_dirs, generate_data_frames, get_num_frames, get_match_median
-from utils.visualize import plot_median_files
+from tracknetv3_utils.general import list_dirs, generate_data_frames, get_num_frames, get_match_median
+from tracknetv3_utils.visualize import plot_median_files
 
 
 # Replace csv to corrected csv in test set
